@@ -547,6 +547,7 @@ int parse_arguments(int argc, char* argv[])
 void usage()
 {
   mbedtls_printf( "%s version %s (client)\n" \
+                  "Server version 1.4.1 or later required\n" \
                   "Copyright (C) 2020 Hsiang Chen, All Rights Reserved\n" \
                   "This program is under the Apache License 2.0\n\n" \
                   "Usage: %s [option]...\n" \
