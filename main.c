@@ -71,7 +71,7 @@ int main( void )
 #include <errno.h>
 #include <netinet/in.h>
 
-#ifdef ANDROID
+#ifdef JACKPOT_EMBED_IN6
 #include <netinet/in6.h>
 #endif
 
