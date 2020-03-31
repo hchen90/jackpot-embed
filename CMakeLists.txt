@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(jackpot-embed)
 
-add_definitions("-DENABLE_PROGRAMS=0 -DENABLE_TESTING=0")
 add_subdirectory(mbedtls)
 
 add_definitions("-Wall -g")

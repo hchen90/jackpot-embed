@@ -69,6 +69,8 @@ int main( void )
 #include <pthread.h>
 #include <signal.h>
 #include <errno.h>
+#include <netinet/in.h>
+#include <netinet/in6.h>
 
 #include "config.h"
 #include "list.h"
