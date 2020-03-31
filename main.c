@@ -70,7 +70,10 @@ int main( void )
 #include <signal.h>
 #include <errno.h>
 #include <netinet/in.h>
+
+#ifdef ANDROID
 #include <netinet/in6.h>
+#endif
 
 #include "config.h"
 #include "list.h"
