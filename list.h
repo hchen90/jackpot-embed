@@ -19,8 +19,6 @@
 #define SUB_DL   0x0100
 #define SUB_FREE 0x0200
 
-#include <pthread.h>
-
 struct _ListNode;
 
 typedef struct _List {
