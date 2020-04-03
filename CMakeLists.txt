@@ -16,7 +16,12 @@ file(GLOB HDRFILES "*.h")
 
 add_executable(jackpot-embed ${SRCFILES} ${HDRFILES})
 target_include_directories(jackpot-embed PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/mbedtls/include")
+
+if(WIN32)
+target_link_libraries(jackpot-embed LINK_PUBLIC mbedtls mbedcrypto mbedx509)
+else(WIN32)
 target_link_libraries(jackpot-embed LINK_PUBLIC mbedtls mbedcrypto mbedx509 "-pthread")
+endif(WIN32)
 
 set(CMAKE_INSTALL_BINDIR "/usr/bin")
 install(TARGETS jackpot-embed DESTINATION ${CMAKE_INSTALL_BINDIR})

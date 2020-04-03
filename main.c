@@ -61,19 +61,42 @@ int main( void )
 #include "mbedtls/error.h"
 #include "mbedtls/certs.h"
 
-#include <string.h>
+#ifdef WIN32
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#ifndef ssize_t
+#define ssize_t long
+#endif
+
+#ifndef size_t
+#define size_t unsigned long
+#endif
+
+#ifndef socklen_t
+#define socklen_t unsigned int
+#endif
+
+#pragma comment(lib,"Ws2_32.lib")
+
+#else
+
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <sys/select.h>
 #include <pthread.h>
-#include <signal.h>
-#include <errno.h>
 #include <netinet/in.h>
-
 #ifdef JACKPOT_EMBED_IN6
 #include <netinet/in6.h>
 #endif
+
+#endif
+
+#include <string.h>
+#include <signal.h>
+#include <errno.h>
 
 #include "config.h"
 #include "list.h"
@@ -112,8 +135,14 @@ struct Server {
 
 struct Client {
   int       done;
+#ifdef WIN32
+  HANDLE    handle;
+  DWORD     tid;
+  SOCKET    fd;
+#else
   pthread_t tid;
   int       fd;
+#endif
   struct    sockaddr_storage addr;
   socklen_t addr_len;
   // mbedtls
@@ -216,46 +245,6 @@ void client_ssl_free(struct Client* cli)
   mbedtls_ssl_config_free(&cli->conf);
 }
 
-/*
-void* client_td(void* arg)
-{
-  struct Client* cli = (struct Client*) arg;
-
-  if (!client_ssl_init(cli, 0)) {
-    int ret;
-
-    while ((ret = mbedtls_ssl_write(&cli->ssl, GET_REQUEST, strlen(GET_REQUEST))) <= 0) {
-      if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
-        break;
-      }
-    }
-
-    if (ret > 0) {
-      char buf[BUFSIZE];
-
-      do {
-        int len = mbedtls_ssl_read(&cli->ssl, buf, sizeof(buf) - 1);
-
-        if (len == MBEDTLS_ERR_SSL_WANT_READ || len == MBEDTLS_ERR_SSL_WANT_WRITE) {
-          continue;
-        }
-
-        if (len == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) break;
-
-        if (len > 0) {
-          buf[len] = 0;
-          mbedtls_printf("%s", buf);
-        } else break;
-      } while (1);
-    }
-    client_ssl_free(cli);
-  }
-
-  cli->done = 1;
-  return 0;
-}
-*/
-
 int client_switch(struct Client* cli)
 {
   char buf[BUFSIZE * 2];
@@ -336,9 +325,18 @@ void client_socks_loop(struct Client* cli)
   }
 }
 
+#ifdef WIN32
+DWORD WINAPI client_td(void* arg)
+#else
 void* client_td(void* arg)
+#endif
 {
+#ifdef WIN32
+	DWORD ret = 0;
+#else
   int ret = 0;
+#endif
+
   struct Client* cli = (struct Client*) arg;
 
   if (!client_ssl_init(cli, 0)) {
@@ -355,13 +353,27 @@ void* client_td(void* arg)
   cli->done = 1;
 
   ret = 0;
+
+#ifdef WIN32
+  ExitThread(ret);
+#else
   pthread_exit(&ret);
+#endif
+
   return 0;
 }
 
 int server_setup(int atype)
 {
+#ifdef WIN32
+  static WORD wsaData;
+#endif
+  
   list_init(&list);
+
+#ifdef WIN32
+  if (WSAStartup(MAKEWORD(2, 0), &wsaData) != 0) return -1;
+#endif
 
   if ((server.fd = socket(atype, SOCK_STREAM, 0)) > 0) {
     struct sockaddr* paddr = NULL;
@@ -407,8 +419,14 @@ void server_shutdown()
 {
   if (server.ready) {
     list_uinit(&list);
+#ifdef WIN32
+    shutdown(server.fd, SD_BOTH);
+    closesocket(server.fd);
+#else
     shutdown(server.fd, SHUT_RDWR);
     close(server.fd);
+#endif
+	WSACleanup();
     server.ready = 0;
   }
 }
@@ -423,8 +441,13 @@ void server_idle()
     if (ln->tags.sub & SUB_PTR) {
       struct Client* cli = (struct Client*) ln->data.ptr;
       if (cli->done) {
+#ifdef WIN32
+        closesocket(cli->fd);
+        CloseHandle(cli->handle);
+#else
         close(cli->fd);
         pthread_kill(cli->tid, 0);
+#endif
         list_remove(&list, i);
       }
     }
@@ -467,19 +490,27 @@ void server_loop()
 
         cli->addr_len = sizeof(cli->addr);
 
-        if ((cli->fd = accept(server.fd, (struct sockaddr*) &cli->addr, &cli->addr_len)) > 0) {
-          ListNode lno;
+		if ((cli->fd = accept(server.fd, (struct sockaddr*) &cli->addr, &cli->addr_len)) > 0) {
+			ListNode lno;
 
-          memset(&lno, 0, sizeof(lno));
+			memset(&lno, 0, sizeof(lno));
 
-          lno.tags.sub = SUB_DATA | SUB_PTR | SUB_FREE | SUB_LEN;
-          lno.data.ptr = cli;
-          lno.data.len = sizeof(struct Client);
+			lno.tags.sub = SUB_DATA | SUB_PTR | SUB_FREE | SUB_LEN;
+			lno.data.ptr = cli;
+			lno.data.len = sizeof(struct Client);
 
+#ifdef WIN32
+			if ((cli->handle = CreateThread(NULL, 0, client_td, cli, 0, &cli->tid)) != 0) {
+				list_insert(&list, -1, &lno);
+				okay = 1;
+			}
+#else
           if (!pthread_create(&cli->tid, 0, client_td, cli)) {
             list_insert(&list, -1, &lno);
             okay = 1;
           }
+#endif
+
         }
       }
 
