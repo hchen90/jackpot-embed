@@ -422,11 +422,11 @@ void server_shutdown()
 #ifdef WIN32
     shutdown(server.fd, SD_BOTH);
     closesocket(server.fd);
+    WSACleanup();
 #else
     shutdown(server.fd, SHUT_RDWR);
     close(server.fd);
 #endif
-	WSACleanup();
     server.ready = 0;
   }
 }
@@ -489,21 +489,21 @@ void server_loop()
         memset(cli, 0, sizeof(struct Client));
 
         cli->addr_len = sizeof(cli->addr);
+      
+        if ((cli->fd = accept(server.fd, (struct sockaddr*) &cli->addr, &cli->addr_len)) > 0) {
+          ListNode lno;
 
-		if ((cli->fd = accept(server.fd, (struct sockaddr*) &cli->addr, &cli->addr_len)) > 0) {
-			ListNode lno;
+          memset(&lno, 0, sizeof(lno));
 
-			memset(&lno, 0, sizeof(lno));
-
-			lno.tags.sub = SUB_DATA | SUB_PTR | SUB_FREE | SUB_LEN;
-			lno.data.ptr = cli;
-			lno.data.len = sizeof(struct Client);
+          lno.tags.sub = SUB_DATA | SUB_PTR | SUB_FREE | SUB_LEN;
+          lno.data.ptr = cli;
+          lno.data.len = sizeof(struct Client);
 
 #ifdef WIN32
-			if ((cli->handle = CreateThread(NULL, 0, client_td, cli, 0, &cli->tid)) != 0) {
-				list_insert(&list, -1, &lno);
-				okay = 1;
-			}
+          if ((cli->handle = CreateThread(NULL, 0, client_td, cli, 0, &cli->tid)) != 0) {
+            list_insert(&list, -1, &lno);
+            okay = 1;
+          }
 #else
           if (!pthread_create(&cli->tid, 0, client_td, cli)) {
             list_insert(&list, -1, &lno);
