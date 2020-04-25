@@ -580,6 +580,53 @@ int parse_arguments(int argc, char* argv[])
   return ret;
 }
 
+#ifdef EXPORT_MODULE
+
+int okay[2] = {0};
+
+extern int export_module_runJackpotProxy (
+  int vpnIsIp6,
+  char* vpnIpAddressStr,
+  char* vpnPortStr,
+  int vpnService,
+  int vpnTimeout,
+  char* vpnSerialStr
+) {
+#if defined(MBETLS_DEBUG_C)
+  mbedtls_debug_set_threshold( DEBUG_LEVEL );
+#endif
+  
+  memset(&server, 0, sizeof(server));
+
+  init_defaults("jackpot-embed");
+
+  strncpy(server.hostip, vpnIpAddressStr, sizeof(server.hostip));
+  strncpy(server.sport, vpnPortStr, sizeof(server.sport));
+  server.port = atoi(vpnPortStr);
+  if (vpnService > 0) server.service = vpnService;
+  if (vpnTimeout > 0) server.timeout = vpnTimeout;
+  strncpy(server.serial, vpnSerialStr, sizeof(server.serial));
+
+  if (!server_setup(vpnIsIp6 > 0 ? AF_INET6 : AF_INET)) {
+    okay[0] = 1;
+    if (!server_ssl_init()) {
+      okay[1] = 1;
+      server_loop();
+    }
+  }
+
+  return okay[0] > 0 && okay[1] > 0;
+}
+
+extern int export_module_terminateJackpotProxy () 
+{
+  if (okay[1] > 0) server_ssl_free();
+  if (okay[0] > 0) server_shutdown();
+  return 0;
+}
+
+#else
+
 void usage()
 {
   mbedtls_printf( "%s version %s (client)\n" \
@@ -626,6 +673,9 @@ int main(int argc, char* argv[])
 
   return(exit_code);
 }
+
+#endif
+
 #endif /* MBEDTLS_BIGNUM_C && MBEDTLS_ENTROPY_C && MBEDTLS_SSL_TLS_C &&
           MBEDTLS_SSL_CLI_C && MBEDTLS_NET_C && MBEDTLS_RSA_C &&
           MBEDTLS_CERTS_C && MBEDTLS_PEM_PARSE_C && MBEDTLS_CTR_DRBG_C &&

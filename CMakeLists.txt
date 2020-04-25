@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(jackpot-embed)
 
-add_subdirectory(mbedtls)
-
 add_definitions("-Wall -g")
+
+if(EXPORT_MODULE)
+add_definitions("-DEXPORT_MODULE -fPIC")
+endif(EXPORT_MODULE)
+
+add_subdirectory(mbedtls)
 
 set(PACKAGE_NAME "jackpot-embed")
 set(PACKAGE_VERSION "1.0")
@@ -14,7 +18,12 @@ configure_file(config.h.in config.h @ONLY)
 file(GLOB SRCFILES "*.c")
 file(GLOB HDRFILES "*.h")
 
+if(EXPORT_MODULE)
+add_library(jackpot-embed SHARED ${SRCFILES} ${HDRFILES})
+else(EXPORT_MODULE)
 add_executable(jackpot-embed ${SRCFILES} ${HDRFILES})
+endif(EXPORT_MODULE)
+
 target_include_directories(jackpot-embed PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/mbedtls/include")
 
 if(WIN32)
