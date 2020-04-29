@@ -1,5 +1,6 @@
 *~
 *.bak
+*.so
 jackpot-embed
 CMakeCache.txt
 CMakeFiles/
